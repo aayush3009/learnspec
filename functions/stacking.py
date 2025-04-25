@@ -5,7 +5,7 @@ from specutils.spectra import Spectrum1D
 from specutils.manipulation import FluxConservingResampler
 from specutils.analysis import snr
 
-from measure_spec import spec_analysis as ms
+from learnspec.functions import readspec as ms
 
 from astropy.io import fits
 from astropy.table import Table
@@ -16,7 +16,7 @@ import astropy.units as u
 
 import matplotlib.pyplot as plt
 
-import mpdaf as mp
+# import mpdaf as mp
 import astropy.units as u
 
 from joblib import Parallel, delayed
