@@ -28,26 +28,6 @@ def resample_spec(spectrum, wavelength_grid):
     return(resampled_spec)
 
 
-def renormalize_spec(speclist, redshifts):    
-    ### Define an empty array to append the de-redshifted spectra
-	rest_spectra = []
-
-	for i in range(len(speclist)):
-		input_spectrum = speclist[i]
-		z = redshifts[i]
-
-		### Read spectrum
-		spectrum = ms.read_spectrum(input_spectrum, z)
-		### de-redshift
-		rest_spectrum = ms.deredshift_spec(spectrum, z)
-		### Normalize spectrum based on flux at 1500A
-		spec_1500 = rest_spectrum[1450*u.AA:1550*u.AA].data
-		flux_1500 = np.nanmean(spec_1500)
-		rest_spectrum_normed = rest_spectrum/flux_1500
-		rest_spectra.append(rest_spectrum_normed)
-
-	return(rest_spectra)
-
 def renormalize_spec(input_spectrum, z):    	
 	### Read spectrum
 	spectrum = ms.read_spectrum(input_spectrum, z)
@@ -120,7 +100,7 @@ def simple_stack(resampled_spectra):
 
 def mean_stacking(speclist, redshifts, resolution=3.):
 	### Define an empty array to append the de-redshifted and normalized spectra
-	rest_spectra, weights = renormalize_spec(speclist, redshifts)
+	rest_spectra = Parallel(n_jobs=-1)(delayed(renormalize_spec)(speclist[i], redshifts[i]) for i in range(len(speclist)))
 
 	### Create a uniform wavelength grid
 	### Min and max wavelengths of NIRSpec PRISM
@@ -137,10 +117,10 @@ def mean_stacking(speclist, redshifts, resolution=3.):
 	resampled_spec = Parallel(n_jobs=-1)(delayed(resample_spec)(source, stack_wavegrid) for source in rest_spectra)
 
 	### Mean/median combine
-	mean_stack = np.average(resampled_spec, weights=weights)
+	mean_stack = np.average(resampled_spec)
 	# err_stack = np.std(resampled_spec, axis=0)    
 
-	return(mean_stack, resampled_spec, weights)
+	return(mean_stack, resampled_spec)
 
 
 def sigma_clipped_stacking(speclist, redshifts, resolution=3.0, sigma=20.0):
