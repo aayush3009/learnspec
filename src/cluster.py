@@ -110,6 +110,5 @@ def plot_cluster_spectra(cluster_label, cluster_spectra, wavelength):
     plt.title(f"Spectra in Cluster {cluster_label}")
     plt.xlabel("Wavelength (A)")
     plt.ylabel("Flux (normalized)")
-    plt.legend()
     plt.tight_layout()
     plt.show()
