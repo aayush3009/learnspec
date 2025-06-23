@@ -129,6 +129,27 @@ class VAE(Model):
         self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = tf.keras.metrics.Mean(name="kl_loss")
 
+    @property
+    def metrics(self):
+        return [
+            self.total_loss_tracker, 
+            self.reconstruction_loss_tracker, 
+            self.kl_loss_tracker]
+    
+    def call(self, data):
+        """
+        Forward pass through the VAE.
+        
+        Args:
+            data (tf.Tensor): Input data
+            
+        Returns:
+            tf.Tensor: Reconstructed output
+        """
+        z_mean, z_log_var, z = self.encoder(data)
+        reconstruction = self.decoder(z)
+        return reconstruction
+
     def train_step(self, data):
         if isinstance(data, tuple):
             data = data[0]
@@ -162,11 +183,23 @@ class VAE(Model):
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result()
         }
+    
+    @classmethod
+    def from_config(cls, config):
+        """
+        Create a VAE instance from its configuration.
+        
+        Args:
+            config (dict): Configuration dictionary
+            
+        Returns:
+            VAE: An instance of the VAE model
+        """
+        encoder = Model.from_config(config['encoder'])
+        decoder = Model.from_config(config['decoder'])
+        return cls(encoder=encoder, decoder=decoder, **config)
 
-    @property
-    def metrics(self):
-        return [self.total_loss_tracker, self.reconstruction_loss_tracker, self.kl_loss_tracker]
-
+    
     
 def create_vae_model(input_dim, latent_dim=16, learning_rate=1e-4):
     """
