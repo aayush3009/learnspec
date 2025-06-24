@@ -5,84 +5,10 @@ This module provides functions for preprocessing spectral data,
 building and training VAE models for spectroscopic analysis.
 """
 import numpy as np
-from scipy.ndimage import gaussian_filter1d
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+import argparse
 
 import tensorflow as tf
 from tensorflow.keras import layers, Model
-
-### Load in the pre-processed data
-def load_data(scaler=True, scale_factor=1., simple_scaling=False, simple_scaler=MinMaxScaler, remove_nan=True, piecewise_smoothing=True, simple_smoothing=False, save_transformed_data=False):
-    ### Load resampled spectra
-    original_resampled_data = np.load("/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/dja_z4-16/dja_resampled_spectra_z4-16.npy")
-    ### Create a copy of the original resampled data
-    resampled_data = np.copy(original_resampled_data)
-
-    ### Load the wavelength grid
-    wavelength = np.load("/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/dja_z4-16/dja_resampled_wavelength_z4-16.npy")
-    ### Load the redshift information
-    redshifts = np.load("/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/dja_z4-16/dja_redshift_info_z4-16.npy")
-
-    ### Load the source IDs
-    speclist = np.load("/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/dja_z4-16/dja_source_id_info_z4-16.npy", allow_pickle=True)
-
-    ### Let's remove NaN values from the spectra by setting them to 0
-    if remove_nan:
-        for i in range(len(resampled_data)):
-            resampled_data[i][np.isnan(resampled_data[i])] = 0.0
-            resampled_data[i][np.isinf(resampled_data[i])] = 0.0
-
-    ### Piecewise smoothing based on wavelength
-    if piecewise_smoothing:
-        ### Find nearest wavelength index
-        def find_nearest_index(wavelengths, target_wavelength):
-            return np.abs(wavelengths - target_wavelength).argmin()
-
-        def piecewise_smooth_spectrum(spectrum, wavelengths):
-            smoothed = np.zeros_like(spectrum)
-            
-            # Define regions and corresponding sigmas
-            idx3000 = find_nearest_index(wavelengths, 3000)
-            idx6000 = find_nearest_index(wavelengths, 6000)
-
-            smoothed[:idx3000] = gaussian_filter1d(spectrum[:idx3000], sigma=2.0)
-            smoothed[idx3000:idx6000] = gaussian_filter1d(spectrum[idx3000:idx6000], sigma=1.5)
-            smoothed[idx6000:] = gaussian_filter1d(spectrum[idx6000:], sigma=1.0)
-
-            return smoothed
-        # Apply the piecewise smoothing function to each spectrum
-        resampled_data = np.array([piecewise_smooth_spectrum(spec, wavelength) for spec in resampled_data])
-
-    if simple_smoothing:
-        resampled_data = gaussian_filter1d(resampled_data, sigma=1.5, axis=1)
-
-    ### Rescale the data using the arcsinh transformation. Other transformations can be used as well.
-    if scaler:
-        arcsinh_transformer = FunctionTransformer(np.arcsinh, validate=True)
-        resampled_data = arcsinh_transformer.fit_transform(resampled_data)/scale_factor
-
-    if simple_scaling:
-        scaler_function = simple_scaler()
-        resampled_data = scaler_function.fit_transform(resampled_data)
-
-    if save_transformed_data:
-        np.save("/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/dja_z4-16/dja_resampled_spectra_z4-16_transformed.npy", resampled_data)
-
-    return resampled_data, wavelength, redshifts, speclist
-
-
-### Identify spectra that may have negative values and return their indices
-def detect_negative_spikes(spectra, threshold=-2.0, prominence=0.5):
-    """Flag spectra with strong negative fluxes in arcsinh-transformed data."""
-    flagged = []
-    for i, spec in enumerate(spectra):
-        # Focus only on values that deviate significantly below median
-        median = np.median(spec)
-        min_flux = np.min(spec)
-        if (min_flux - median) < threshold and abs(min_flux - median) > prominence:
-            flagged.append(i)
-    return flagged
 
 
 ### Create a VAE model to be trained on the pre-processed data
@@ -260,3 +186,142 @@ def train_vae_model(model, data, epochs=100, batch_size=64, shuffle=True):
         shuffle=shuffle)
     
     return history
+
+
+def main():
+    """
+    Main function to allow command-line model training.
+    
+    Example usage:
+    python -m learnspec.src.train --datadir ../data --data data/resampled_data.npy --wavelength data/wavelength.npy --redshifts data/redshifts.npy --speclist data/speclist.npy 
+    --scaler True --scale_factor 1.0 --latent-dim 16 --learning-rate 1e-4 --epochs 500 --batch-size 64 --save-dir ../models --model-name vae_model --plot-history
+    """
+
+    parser = argparse.ArgumentParser(description='Train a VAE model on spectroscopic data')
+    
+    # Model options                    
+    model_group = parser.add_argument_group('Model Options')
+    model_group.add_argument('--latent-dim', type=int, default=16, 
+                        help='Dimensionality of the latent space')
+    model_group.add_argument('--learning-rate', type=float, default=1e-4, 
+                        help='Learning rate for Adam optimizer')
+
+                        
+    # Training options
+    training_group = parser.add_argument_group('Training Options')
+    training_group.add_argument('--epochs', type=int, default=500, 
+                        help='Number of training epochs')
+    training_group.add_argument('--batch-size', type=int, default=64, 
+                        help='Batch size for training')
+    training_group.add_argument('--model-name', type=str, default='vae_model',
+                        help='Base name for saved model files')    
+    
+   
+    # Output options
+    output_group = parser.add_argument_group('Output Options')
+    model_group.add_argument('--scaler', action='store_true', default=False
+                        help='Apply arcsinh transformation to the data')
+    output_group.add_argument('--save-dir', type=str, default='../models', default=None,
+                        help='Directory to save models')
+    output_group.add_argument('--plot-history', action='store_true', default=False
+                        help='Plot training history and save to file')
+    
+    args = parser.parse_args()
+
+    # Use dataset name as model name if not provided
+    if args.model_name is None:
+        args.model_name = args.dataset
+    
+    # Print training configuration
+    print(f"Training VAE model with configuration:")
+    print(f"  - Latent dimensions: {args.latent_dim}")
+    print(f"  - Learning rate: {args.learning_rate}")
+    print(f"  - Epochs: {args.epochs}")
+    print(f"  - Batch size: {args.batch_size}")
+    
+    # Create and train model
+    try:
+        print("Creating VAE model...")
+        vae_model = create_vae_model(
+            input_dim=input_dim, 
+            latent_dim=args.latent_dim,
+            learning_rate=args.learning_rate
+        )
+        
+        print(f"Starting training for {args.epochs} epochs...")
+        history = train_vae_model(
+            vae_model, 
+            resampled_data, 
+            epochs=args.epochs, 
+            batch_size=args.batch_size,
+            validation_split=args.validation_split
+        )
+        
+    except Exception as e:
+        print(f"Error during model creation or training: {e}")
+        return
+    
+    # Save models
+    if args.save_models:
+        try:
+            os.makedirs(args.save_dir, exist_ok=True)
+            
+            # Create model file names
+            base_name = f"{args.model_name}_dim{args.latent_dim}"
+            encoder_path = os.path.join(args.save_dir, f"{base_name}_encoder.keras")
+            decoder_path = os.path.join(args.save_dir, f"{base_name}_decoder.keras")
+            weights_path = os.path.join(args.save_dir, f"{base_name}_weights.h5")
+            
+            print(f"Saving encoder to {encoder_path}")
+            vae_model.encoder.save(encoder_path)
+            
+            print(f"Saving decoder to {decoder_path}")
+            vae_model.decoder.save(decoder_path)
+            
+            print(f"Saving weights to {weights_path}")
+            vae_model.save_weights(weights_path)
+            
+            print("Training complete and models saved!")
+        
+        except Exception as e:
+            print(f"Error saving models: {e}")
+            if not args.plot_history:
+                return vae_model, history
+
+    else:
+        print("Skipping model saving (use --save-models to save)")
+            
+    # Print final loss values
+    print(f"Final loss: {history.history['loss'][-1]:.4f}")
+    print(f"Final reconstruction loss: {history.history['reconstruction_loss'][-1]:.4f}")
+    print(f"Final KL loss: {history.history['kl_loss'][-1]:.4f}")
+            
+    # Plot training history if requested
+    if args.plot_history:
+        try:
+            import matplotlib.pyplot as plt
+            plt.figure(figsize=(10, 6))
+            plt.plot(history.history['loss'], label='Total Loss')
+            plt.plot(history.history['reconstruction_loss'], label='Reconstruction Loss')
+            plt.plot(history.history['kl_loss'], label='KL Loss')
+            plt.xlabel('Epochs')
+            plt.ylabel('Loss')
+            plt.legend()
+            plt.title('VAE Training Loss')
+            
+            history_plot_path = os.path.join(args.save_dir, f"{base_name}_training_history.png")
+            plt.savefig(history_plot_path, dpi=300)
+            print(f"Training history plot saved to {history_plot_path}")
+        except Exception as e:
+            print(f"Error creating training history plot: {e}")
+
+    else:
+        print("Skipping training history plot (use --plot-history to plot)")
+    
+    # Return the trained model and history
+    print("Training complete!")           
+    return vae_model, history
+
+
+if __name__ == "__main__":
+    main()
