@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import argparse
 from scipy.ndimage import gaussian_filter1d
 from sklearn.preprocessing import FunctionTransformer
@@ -24,7 +25,7 @@ def load_data(data_dir="/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/dat
     return resampled_data, wavelength, redshifts, speclist
 
 
-def process_data(resampled_data, wavelength, scaler=True, scale_factor=1., simple_scaling=False, simple_scaler=MinMaxScaler, remove_nan=True, piecewise_smoothing=True, simple_smoothing=False, save_transformed_data=False, output_data_path=None):    
+def process_data(resampled_data, wavelength, scaler=True, scale_factor=1., simple_scaling=False, simple_scaler=MinMaxScaler, remove_nan=True, piecewise_smoothing=True, simple_smoothing=False, save_transformed_data=True, output_data_path="../data/output/", output_file_name="processed_spectra.npy"):    
     ### Let's remove NaN values from the spectra by setting them to 0
     if remove_nan:
         for i in range(len(resampled_data)):
@@ -65,7 +66,9 @@ def process_data(resampled_data, wavelength, scaler=True, scale_factor=1., simpl
         resampled_data = scaler_function.fit_transform(resampled_data)
 
     if save_transformed_data:
-        np.save(str(output_data_path), resampled_data)
+        output_data_file = output_data_path + output_file_name
+        np.save(output_data_file, resampled_data)
+        print(f"Transformed data saved to {output_data_file}")
 
     return resampled_data
 
@@ -88,7 +91,7 @@ def main():
     Main function to allow command-line data loading.
     
     Example usage:
-    python -m learnspec.src.load --datadir ../data --data data/resampled_data.npy --wavelength data/wavelength.npy --redshifts data/redshifts.npy --speclist data/speclist.npy 
+    python load.py --datadir ../data --data data/resampled_data.npy --wavelength data/wavelength.npy --redshifts data/redshifts.npy --speclist data/speclist.npy 
     --scaler True --scale_factor 1.0 --simple_scaling False --simple_smoothing False --remove_nan True --piecewise_smoothing True --save_transformed_data False
     --output_data_path data/processed_data.npy
     """
@@ -96,15 +99,15 @@ def main():
     parser = argparse.ArgumentParser(description='Load spectroscopic data and preprocess it for training a model.')
     # Data input options
     data_group = parser.add_argument_group('Data Options')
-    data_group.add_argument('--datadir', type=str, default='../data',
+    data_group.add_argument('--datadir', type=str, default='../data/', required=False,
                         help='Directory containing input data files')
-    data_group.add_argument('--data', type=str, required=True,
+    data_group.add_argument('--data', type=str, default="dja_z4-16/dja_resampled_spectra_z4-16.npy", required=False,
                         help='Path to resampled spectral data (.npy file)')
-    data_group.add_argument('--wavelength', type=str, required=True,
+    data_group.add_argument('--wavelength', type=str, default="dja_z4-16/dja_resampled_wavelength_z4-16.npy", required=False,
                         help='Path to wavelength array (.npy file)')
-    data_group.add_argument('--redshifts', type=str, required=True,
+    data_group.add_argument('--redshifts', type=str, default="dja_z4-16/dja_redshift_info_z4-16.npy", required=False,
                         help='Path to redshifts array (.npy file)')
-    data_group.add_argument('--speclist', type=str, required=True,
+    data_group.add_argument('--speclist', type=str, default="dja_z4-16/dja_source_id_info_z4-16.npy", required=False,
                         help='Path to speclist array (.npy file)')
     
     # Data processing options
@@ -121,31 +124,27 @@ def main():
                         help='Remove NaN values from data')
     processing_group.add_argument('--piecewise_smoothing', type=bool, default=True, 
                         help='Apply piecewise smoothing to data')
-    processing_group.add_argument('--save_transformed_data', type=bool, default=False, 
+    processing_group.add_argument('--save_transformed_data', type=bool, default=True, 
                         help='Save transformed data to file')
-    processing_group.add_argument('--output_data_path', type=str, default=None,
+    processing_group.add_argument('--output_data_path', type=str, default="../data/output/",
                         help='Path to save the processed data (if save_transformed_data is True)')
+    processing_group.add_argument('--output_file_name', type=str, default="processed_spectra.npy",
+                        help='Name of the output file for processed data')
     
     args = parser.parse_args()
-
-    # Use dataset name as model name if not provided
-    if args.model_name is None:
-        args.model_name = args.dataset
-
     
     # Load data
     try:
-        print(f"Loading dataset '{args.dataset}' from {args.data_dir}...")
+        print(f"Loading dataset...")
         resampled_data, wavelength, redshifts, speclist = load_data(
-            data_dir=args.data_dir,
+            data_dir=args.datadir,
             data_path=args.data,
             wavelength_path=args.wavelength,
             redshift_path=args.redshifts,
             speclist_path=args.speclist
         )
         
-        input_dim = get_input_dim(resampled_data)
-        print(f"Data loaded: {len(resampled_data)} spectra with {input_dim} features")
+        print(f"Data loaded: {len(resampled_data)}")
         print(f"Redshift range: {np.min(redshifts):.2f} to {np.max(redshifts):.2f}")
         
         # Check for problematic spectra
@@ -161,28 +160,31 @@ def main():
     try:
         print("Processing data...")
         resampled_data = process_data(
-            resampled_data, 
+            resampled_data,
+            wavelength, 
             scaler=args.scaler, 
             scale_factor=args.scale_factor,
             simple_scaling=args.simple_scaling,
-            simple_smoothing=False,  # Set to True if you want to apply Gaussian smoothing 
-            remove_nan=True,  # Set to False if you want to keep NaN values
-            piecewise_smoothing=True,  # Set to False if you don't want piecewise smoothing
-            save_transformed_data=False,  # Set to True if you want to save the transformed data
-            output_data_path=args.save_dir + '/processed_data.npy'  # Path to save the processed data
+            simple_smoothing=args.simple_smoothing,  # Set to True if you want to apply Gaussian smoothing 
+            remove_nan=args.remove_nan,  # Set to False if you want to keep NaN values
+            piecewise_smoothing=args.piecewise_smoothing,  # Set to False if you don't want piecewise smoothing
+            save_transformed_data=args.save_transformed_data,  # Set to True if you want to save the transformed data
+            output_data_path=args.output_data_path,  # Path to save the processed data
+            output_file_name=args.output_file_name  # Name of the output file
         )
         print(f"Data processed: {resampled_data.shape[0]} spectra with {resampled_data.shape[1]} features")
     except Exception as e:
         print(f"Error processing data: {e}")
         return
     
-    # Save processed data if required
-    if args.save_transformed_data and args.output_data_path:
-        try:
-            np.save(args.output_data_path, resampled_data)
-            print(f"Processed data saved to {args.output_data_path}")
-        except Exception as e:
-            print(f"Error saving processed data: {e}")
+    # # Save processed data if required
+    # if args.save_transformed_data:
+    #     try:
+    #         os.makedirs(os.path.dirname(args.output_data_path), exist_ok=True)
+    #         np.save(args.output_data_path, resampled_data)
+    #         print(f"Processed data saved to {args.output_data_path}")
+    #     except Exception as e:
+    #         print(f"Error saving processed data: {e}")
 
     print("Data loading and processing completed successfully.")
     

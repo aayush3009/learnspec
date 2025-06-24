@@ -197,7 +197,7 @@ def main():
     Example usage:
     python train.py --input-data /path/to/data.npy --latent-dim 16 --epochs 500 --save
     """
-        
+
     parser = argparse.ArgumentParser(description='Train VAE model on spectroscopic data')
     
     # Data options
@@ -260,7 +260,6 @@ def main():
             data=data,
             epochs=args.epochs,
             batch_size=args.batch_size,
-            validation_split=args.validation_split
         )
         
         print("\nTraining completed successfully")
