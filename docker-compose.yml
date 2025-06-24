@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  learnspec:
+    build: .
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    command: bash
