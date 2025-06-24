@@ -50,7 +50,7 @@ learnspec/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/learnspec.git
+git clone https://github.com/aayush3009/learnspec.git
 cd learnspec
 
 # Install dependencies
@@ -126,10 +126,8 @@ vae_model.save_weights("models/vae_model.weights.h5")
 vae_model.load_weights("models/vae_model.weights.h5")
 ```
 
-## License
+## Author
 
-[Add your license here]
+Aayush Saxena
 
-## Citation
-
-[Add citation information if applicable]
+aayush.saxena@physics.ox.ac.uk
