@@ -24,7 +24,7 @@ def load_data(data_dir="/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/dat
     return resampled_data, wavelength, redshifts, speclist
 
 
-def process_data(resampled_data, scaler=True, scale_factor=1., simple_scaling=False, simple_scaler=MinMaxScaler, remove_nan=True, piecewise_smoothing=True, simple_smoothing=False, save_transformed_data=False, output_data_path=None):    
+def process_data(resampled_data, wavelength, scaler=True, scale_factor=1., simple_scaling=False, simple_scaler=MinMaxScaler, remove_nan=True, piecewise_smoothing=True, simple_smoothing=False, save_transformed_data=False, output_data_path=None):    
     ### Let's remove NaN values from the spectra by setting them to 0
     if remove_nan:
         for i in range(len(resampled_data)):
