@@ -4,7 +4,7 @@ A machine learning project for analyzing astronomical spectra from the JADES sur
 
 ## Overview
 
-LearnSpec is a deep learning pipeline designed for analyzing and classifying astronomical spectra from the JADES (JWST Advanced Deep Extragalactic Survey) and DAWN JWST Archive (DJA) datasets. The project uses Variational Autoencoders (VAEs) for dimensionality reduction and feature learning, followed by clustering techniques like Gaussian Mixture Models to identify patterns in spectral data.
+LearnSpec is a deep learning pipeline designed for analyzing and classifying astronomical spectra from JWST using the publicly available DAWN JWST Archive (DJA) datasets. The project uses Variational Autoencoders (VAEs) for dimensionality reduction and feature learning, followed by clustering techniques like Gaussian Mixture Models to identify patterns in spectral data.
 
 ## Features
 
