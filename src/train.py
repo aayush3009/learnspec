@@ -52,16 +52,41 @@ class VAE(Model):
         super().__init__(**kwargs)
         self.encoder = encoder
         self.decoder = decoder
+
+        # Define metrics
         self.total_loss_tracker = tf.keras.metrics.Mean(name="loss")
         self.reconstruction_loss_tracker = tf.keras.metrics.Mean(name="reconstruction_loss")
         self.kl_loss_tracker = tf.keras.metrics.Mean(name="kl_loss")
+
+        # Add validation metrics
+        self.val_total_loss_tracker = tf.keras.metrics.Mean(name="val_total_loss")
+        self.val_reconstruction_loss_tracker = tf.keras.metrics.Mean(name="val_reconstruction_loss")
+        self.val_kl_loss_tracker = tf.keras.metrics.Mean(name="val_kl_loss")
+
+    def reset_metrics(self):
+        """Reset all metrics trackers."""
+        metrics = [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+            self.val_total_loss_tracker,
+            self.val_reconstruction_loss_tracker,
+            self.val_kl_loss_tracker
+        ]
+        for metric in metrics:
+            metric.reset_state()
+
 
     @property
     def metrics(self):
         return [
             self.total_loss_tracker, 
             self.reconstruction_loss_tracker, 
-            self.kl_loss_tracker]
+            self.kl_loss_tracker,
+            self.val_total_loss_tracker, 
+            self.val_reconstruction_loss_tracker, 
+            self.val_kl_loss_tracker
+        ]
     
     def call(self, data):
         """
@@ -111,6 +136,37 @@ class VAE(Model):
             "kl_loss": self.kl_loss_tracker.result()
         }
     
+    def test_step(self, data):
+        if isinstance(data, tuple):
+            data = data[0]
+
+        z_mean, z_log_var, z = self.encoder(data)
+        reconstruction = self.decoder(z)
+
+        # === Masking regions where data == 0 (i.e., formerly NaN) ===
+        mask = tf.cast(tf.not_equal(data, 0.0), tf.float32)
+        diff = mask * (data - reconstruction)
+        reconstruction_loss = tf.reduce_mean(tf.reduce_sum(tf.square(diff), axis=1))
+
+        # KL divergence (safe)
+        z_log_var_clipped = tf.clip_by_value(z_log_var, -10.0, 10.0)
+        kl_loss = -0.5 * tf.reduce_mean(tf.reduce_sum(
+            1 + z_log_var_clipped - tf.square(z_mean) - tf.exp(z_log_var_clipped), axis=1
+        ))
+
+        total_loss = reconstruction_loss + kl_loss
+
+        self.val_total_loss_tracker.update_state(total_loss)
+        self.val_reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.val_kl_loss_tracker.update_state(kl_loss)
+
+        return {
+            "loss": self.val_total_loss_tracker.result(),
+            "reconstruction_loss": self.val_reconstruction_loss_tracker.result(),
+            "kl_loss": self.val_kl_loss_tracker.result()
+        }
+    
+
     @classmethod
     def from_config(cls, config):
         """
@@ -128,7 +184,7 @@ class VAE(Model):
 
     
     
-def create_vae_model(input_dim, latent_dim=16, learning_rate=1e-4):
+def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4):
     """
     Creates a Variational Autoencoder model with specified dimensions
     
@@ -158,14 +214,61 @@ def create_vae_model(input_dim, latent_dim=16, learning_rate=1e-4):
 
     decoder = Model(latent_inputs, outputs, name="decoder")
 
+    # Define learning rate schedule
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate,
+        decay_steps=1000,
+        decay_rate=0.95,
+        staircase=True
+    )
+
     # Create and compile VAE
     vae = VAE(encoder, decoder)
-    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate))
+    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
+                loss=None
+                )
     
     return vae
 
+
+class ConvergenceCallback(tf.keras.callbacks.Callback):
+    def __init__(self, patience=50, min_delta=1e-4, min_epochs=200):
+        super().__init__()
+        self.patience = patience
+        self.min_delta = min_delta
+        self.min_epochs = min_epochs
+        # self.best_loss = float('inf')
+        self.best_val_loss = float('inf')
+        self.wait = 0
+        self.stopped_epoch = 0
+        self.converged = False
+        # self.history = []
+    
+    def on_epoch_end(self, epoch, logs=None):
+        # current_loss = logs.get('reconstruction_loss')
+        # self.history.append(current_loss)
+
+        # Monitor validation loss instead of training loss
+        val_loss = logs.get('val_reconstruction_loss')
+        
+        if epoch < self.min_epochs:
+            return
+            
+        if val_loss < self.best_loss - self.min_delta:
+            self.best_val_loss = val_loss
+            self.wait = 0
+        else:
+            self.wait += 1
+            if self.wait >= self.patience:
+                self.stopped_epoch = epoch
+                self.model.stop_training = True
+                self.converged = True
+                print(f"\nConvergence detected at epoch {epoch}")
+                print(f"Best validation loss: {self.best_val_loss:.6f}")
+
+
 ### Function to train the VAE model
-def train_vae_model(model, data, epochs=100, batch_size=64, shuffle=True):
+def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_size=64, shuffle=True):
     """
     Trains the VAE model on the provided data
     
@@ -179,12 +282,86 @@ def train_vae_model(model, data, epochs=100, batch_size=64, shuffle=True):
     Returns:
         history: Training history
     """
+
+    # Split data into training and validation sets
+    val_size = int(len(data) * validation_split)
+    indices = np.random.permutation(len(data))
+    val_indices = indices[:val_size]
+    train_indices = indices[val_size:]
+    
+    train_data = data[train_indices]
+    val_data = data[val_indices]
+
+    # Build model by calling it on a single batch
+    sample_batch = train_data[:batch_size]
+    model(sample_batch)
+
+    # Reset metrics before training
+    model.reset_metrics()
+
+    # Callbacks for monitoring training
+    callbacks = [
+        # Early stopping based on validation loss
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_reconstruction_loss',
+            mode='min',
+            patience=50,
+            restore_best_weights=True,
+            verbose=1
+        ),
+        
+        # # Learning rate reduction on plateau
+        # tf.keras.callbacks.ReduceLROnPlateau(
+        #     monitor='val_reconstruction_loss',
+        #     factor=0.5,
+        #     patience=30,
+        #     min_lr=1e-6,
+        #     verbose=1
+        # ),
+
+        # TensorBoard callback for logging
+        tf.keras.callbacks.TensorBoard(
+            log_dir='./logs',
+            histogram_freq=1,
+            write_graph=True,
+            update_freq='epoch'
+        ),
+        
+        # Model checkpoint to save best model
+        tf.keras.callbacks.ModelCheckpoint(
+            'best_model.weights.h5',
+            monitor='val_reconstruction_loss',
+            mode='min',
+            save_best_only=True,
+            save_weights_only=True,
+            verbose=1
+        )
+    ]
+
+    print("\nTraining Configuration:")
+    print(f"Training samples: {len(train_data)}")
+    print(f"Validation samples: {len(val_data)}")
+    print(f"Batch size: {batch_size}")
+    print(f"Maximum epochs: {max_epochs}")
+
     # Train the VAE model
     history = model.fit(
-        data, 
-        epochs=epochs, 
+        train_data,
+        validation_data=(val_data, None),
+        epochs=max_epochs,
         batch_size=batch_size, 
-        shuffle=shuffle)
+        shuffle=shuffle,
+        callbacks=callbacks,
+        verbose=1
+    )
+    
+    # Load best weights
+    model.load_weights('best_model.weights.h5')
+
+    # Print final training metrics
+    print("\nFinal Training Metrics:")
+    print(f"Best validation reconstruction loss: {min(history.history['val_reconstruction_loss']):.6f}")
+    print(f"Best validation KL loss: {min(history.history['val_kl_loss']):.6f}")
     
     return history
 
