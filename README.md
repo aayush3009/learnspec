@@ -1,6 +1,6 @@
 # LearnSpec: Spectral Analysis with VAE
 
-A machine learning project for analyzing astronomical spectra from the JADES survey using Variational Autoencoders (VAE) and unsupervised clustering techniques.
+A machine learning project for analyzing astronomical spectra from JWST using Variational Autoencoders (VAE) and clustering techniques.
 
 ## Overview
 
