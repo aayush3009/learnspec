@@ -68,7 +68,7 @@ pip install -e .
 docker compose build
 
 # Run container
-docker compose run learnspec```
+docker compose run learnspec
 ```
 
 ## Usage
