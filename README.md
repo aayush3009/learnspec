@@ -69,30 +69,29 @@ docker-compose up --build
 
 ## Usage
 
-The main analysis pipeline is implemented in the Jupyter notebook `notebooks/vae_clustering.ipynb`. The notebook includes:
-
-1. Data loading and preprocessing
-2. VAE model creation and training
-3. Latent space analysis with UMAP
-4. Clustering of spectra
-5. Visualization of cluster properties
-
-### Example: Creating and training a VAE model
+### Training a VAE Model
 
 ```python
-from learnspec.src import train
-
-# Load preprocessed data
-resampled_data, wavelength, redshifts, speclist = train.load_data()
-
-# Create and train VAE model
-input_dim = train.get_input_dim(resampled_data)
-latent_dim = 16
-vae_model = train.create_vae_model(input_dim, latent_dim)
-history = train.train_vae_model(vae_model, resampled_data, epochs=500, batch_size=64)
+python -m learnspec.src.train \
+    --input-data /path/to/data.npy \
+    --validation-split 0.2 \
+    --latent-dim 16 \
+    --epochs 1000 \
+    --batch-size 32 \
+    --save-models \
+    --plot-training
 ```
 
-### Example: Clustering spectra in latent space
+### Making Predictions
+
+```python
+python -m learnspec.src.predict \
+    --encoder-path models/encoder.keras \
+    --decoder-path models/decoder.keras \
+    --input-data data/test_data.npy
+```
+
+### Clustering spectra in latent space
 
 ```python
 from learnspec.src import predict, cluster
@@ -109,25 +108,29 @@ gmm = GaussianMixture(n_components=10, covariance_type='full', random_state=42)
 cluster_labels = gmm.fit_predict(z_2d)
 ```
 
-## Model Saving and Loading
+## Docker Support
 
-```python
-# Save encoder and decoder separately (recommended)
-vae_model.encoder.save("models/vae_encoder.keras")
-vae_model.decoder.save("models/vae_decoder.keras")
+### Building the container
 
-# Load encoder and decoder
-from tensorflow import keras
-encoder = keras.models.load_model("models/vae_encoder.keras")
-decoder = keras.models.load_model("models/vae_decoder.keras")
+```bash
+cd /path/to/learnspec
+docker compose build
+```
 
-# Alternatively, save and load weights
-vae_model.save_weights("models/vae_model.weights.h5")
-vae_model.load_weights("models/vae_model.weights.h5")
+### Running the container
+
+```bash
+docker compose run learnspec
+```
+
+### Updating the Container
+
+After code changes:
+
+```bash
+docker compose build --no-cache
 ```
 
 ## Author
 
-Aayush Saxena
-
-aayush.saxena@physics.ox.ac.uk
+Aayush Saxena (aayush.saxena@physics.ox.ac.uk)
