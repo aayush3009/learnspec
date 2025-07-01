@@ -372,7 +372,7 @@ def main():
     Handles model creation, training, and saving.
 
     Example usage:
-    python train.py --input-data /path/to/data.npy --latent-dim 16 --epochs 500 --save
+    python train.py --input-data /path/to/data.npy --validation-split 0.2 --epochs 1000 --save-models --plot-training
     """
 
     parser = argparse.ArgumentParser(description='Train VAE model on spectroscopic data')
