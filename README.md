@@ -108,6 +108,7 @@ gmm = GaussianMixture(n_components=10, covariance_type='full', random_state=42)
 cluster_labels = gmm.fit_predict(z_2d)
 ```
 
+
 ## Docker Support
 
 ### Building the container
