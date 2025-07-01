@@ -64,8 +64,11 @@ pip install -e .
 ### Option 2: Docker Installation
 
 ```bash
-# Build and run the Docker container
-docker-compose up --build
+# Build Docker image
+docker compose build
+
+# Run container
+docker compose run learnspec```
 ```
 
 ## Usage
