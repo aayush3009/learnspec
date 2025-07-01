@@ -38,7 +38,8 @@ learnspec/
 ├── notebooks/             # Jupyter notebooks
 │   └── vae_clustering.ipynb  # Main analysis notebook
 ├── src/                   # Core source code
-│   ├── train.py           # VAE model training functions
+│   ├── load.py            # Data loading functions
+    ├── train.py           # VAE model training functions
 │   ├── predict.py         # Model prediction utilities
 │   └── cluster.py         # Clustering algorithms
 └── Dockerfile             # Docker configuration
