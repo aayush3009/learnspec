@@ -381,6 +381,8 @@ def main():
     data_group = parser.add_argument_group('Data Options')
     data_group.add_argument('--input-data', type=str, required=True,
                            help='Path to input data array (.npy file)')
+    data_group.add_argument('--validation-split', type=float, default=0.2,
+                           help='Fraction of data to use for validation (default: 0.2)')
     
     # Model configuration
     model_group = parser.add_argument_group('Model Options')
@@ -395,8 +397,8 @@ def main():
                            help='Number of training epochs')
     train_group.add_argument('--batch-size', type=int, default=64,
                            help='Training batch size')
-    train_group.add_argument('--validation-split', type=float, default=0.1,
-                           help='Fraction of data for validation')
+    train_group.add_argument('--early-stopping-patience', type=int, default=50,
+                           help='Patience for early stopping')
     
     # Output options
     output_group = parser.add_argument_group('Output Options')
@@ -435,7 +437,8 @@ def main():
         history = train_vae_model(
             model=vae_model,
             data=data,
-            epochs=args.epochs,
+            validation_split=args.validation_split,
+            max_epochs=args.epochs,
             batch_size=args.batch_size,
         )
         
@@ -460,11 +463,17 @@ def main():
             decoder_path = os.path.join(args.save_dir, f"{base_name}_decoder.keras")
             print(f"Saving decoder to: {decoder_path}")
             vae_model.decoder.save(decoder_path)
-            
-            # Save weights
-            weights_path = os.path.join(args.save_dir, f"{base_name}_weights.h5")
-            print(f"Saving weights to: {weights_path}")
-            vae_model.save_weights(weights_path)
+
+            # Save training history
+            history_path = os.path.join(args.save_dir, f"{base_name}_history.npz")
+            np.savez(history_path, 
+                    loss=history.history['loss'],
+                    val_loss=history.history['val_loss'],
+                    reconstruction_loss=history.history['reconstruction_loss'],
+                    val_reconstruction_loss=history.history['val_reconstruction_loss'],
+                    kl_loss=history.history['kl_loss'],
+                    val_kl_loss=history.history['val_kl_loss'])
+            print(f"Saved training history to: {history_path}")
             
         except Exception as e:
             print(f"Error saving models: {e}")
