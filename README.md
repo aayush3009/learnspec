@@ -111,8 +111,7 @@ cluster_labels = gmm.fit_predict(z_2d)
 
 ## Docker Support
 
-
-### Building the container
+### Building the container
 
 ```bash
 cd /path/to/learnspec
@@ -127,7 +126,7 @@ docker compose run learnspec
 ```
 
 
-### Updating the Container
+### Updating the Container
 
 After code changes:
 
