@@ -184,7 +184,7 @@ class VAE(Model):
 
     
     
-def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4):
+def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_reg=0.001):
     """
     Creates a Variational Autoencoder model with specified dimensions
     
@@ -198,41 +198,68 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4):
     """
     # === Encoder ===
     inputs = tf.keras.Input(shape=(input_dim,))
-    x = layers.Dense(512, activation='relu')(inputs)
-    x = layers.Dense(256, activation='relu')(x)
+    x = layers.Dense(
+        512, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(inputs)
+    x = layers.Dropout(0.3)(x)  # Add Dropout for regularization
+
+    x = layers.Dense(
+        256, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(x)
+    x = layers.Dropout(0.3)(x)  # Add Dropout for regularization
+
     z_mean = layers.Dense(latent_dim, name='z_mean')(x)
     z_log_var = layers.Dense(latent_dim, name='z_log_var')(x)
-
     z = layers.Lambda(sampling, name='z')([z_mean, z_log_var])
+
     encoder = Model(inputs, [z_mean, z_log_var, z], name="encoder")
 
     # === Decoder ===
     latent_inputs = tf.keras.Input(shape=(latent_dim,))
-    x = layers.Dense(256, activation='relu')(latent_inputs)
-    x = layers.Dense(512, activation='relu')(x)
-    outputs = layers.Dense(input_dim, activation='linear')(x)
+    x = layers.Dense(
+        256, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(latent_inputs)
+    x = layers.Dropout(0.3)(x)  # Add Dropout for regularization
 
+    x = layers.Dense(
+        512, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(x)
+    x = layers.Dropout(0.3)(x)  # Add Dropout for regularization
+
+    outputs = layers.Dense(input_dim, activation='linear')(x)
     decoder = Model(latent_inputs, outputs, name="decoder")
 
     # Define learning rate schedule
     lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
         initial_learning_rate,
-        decay_steps=1000,
+        decay_steps=500,
         decay_rate=0.95,
         staircase=True
     )
 
+    # Optimizer
+    optimizer = tf.keras.optimizers.Adam(
+        learning_rate=lr_schedule,
+        clipnorm=2.0
+    )
+
     # Create and compile VAE
     vae = VAE(encoder, decoder)
-    vae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
-                loss=None
-                )
+    vae.compile(optimizer=optimizer)
     
     return vae
 
 
 class ConvergenceCallback(tf.keras.callbacks.Callback):
-    def __init__(self, patience=50, min_delta=1e-4, min_epochs=200):
+    def __init__(self, patience=50, min_delta=2.0, min_epochs=100):
         super().__init__()
         self.patience = patience
         self.min_delta = min_delta
@@ -250,11 +277,29 @@ class ConvergenceCallback(tf.keras.callbacks.Callback):
 
         # Monitor validation loss instead of training loss
         val_loss = logs.get('val_reconstruction_loss')
+
+        if val_loss is None:
+            # Fallback to val_loss if val_reconstruction_loss not available
+            val_loss = logs.get('val_loss')
+
+        if val_loss is None:
+            print("Warning: No validation loss found to monitor")
+            return
         
+        # Print debugging information occasionally
+        if epoch % 20 == 0:
+            print(f"\nEpoch {epoch}")
+            print(f"Current val loss: {val_loss:.6f}")
+            print(f"Best val loss: {self.best_val_loss:.6f}")
+            print(f"Wait counter: {self.wait}")
+        
+        # Don't check convergence until minimum epochs reached
         if epoch < self.min_epochs:
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
             return
             
-        if val_loss < self.best_loss - self.min_delta:
+        if val_loss < (self.best_val_loss - self.min_delta):
             self.best_val_loss = val_loss
             self.wait = 0
         else:
@@ -273,9 +318,10 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
     Trains the VAE model on the provided data
     
     Args:
-        vae: Compiled VAE model
+        model: Compiled VAE model
         data (np.ndarray): Training data
-        epochs (int): Number of epochs to train
+        validation_split: Fraction of training data used for validation
+        max_epochs (int): Maximum number of epochs to train
         batch_size (int): Size of each training batch
         shuffle (bool): Whether to shuffle the data before training
         
@@ -298,6 +344,13 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
 
     # Reset metrics before training
     model.reset_metrics()
+
+    # Create convergence callback instance
+    convergence = ConvergenceCallback(
+        patience=20,
+        min_delta=2,
+        min_epochs=150
+    )
 
     # Callbacks for monitoring training
     callbacks = [
@@ -335,7 +388,10 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
             save_best_only=True,
             save_weights_only=True,
             verbose=1
-        )
+        ),
+
+        # Add the convergence callback here
+        convergence
     ]
 
     print("\nTraining Configuration:")
@@ -354,6 +410,14 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
         callbacks=callbacks,
         verbose=1
     )
+
+    # Check convergence status after training
+    if convergence.converged:
+        print(f"\n✓ Model converged after {convergence.stopped_epoch + 1} epochs")
+        print(f"Best validation loss: {convergence.best_val_loss:.6f}")
+    else:
+        print(f"\n⚠ Model reached maximum epochs ({max_epochs}) without convergence")
+        print(f"Final validation loss: {history.history['val_loss'][-1]:.6f}")
     
     # Load best weights
     model.load_weights('best_model.weights.h5')

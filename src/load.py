@@ -7,10 +7,10 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 
 ### Load in the pre-processed data
 def load_data(data_dir="/Users/aayushsaxena/Desktop/Oxford/scripts/learnspec/data/", 
-              data_path="dja_z4-16/dja_resampled_spectra_z4-16.npy", 
-              wavelength_path="dja_z4-16/dja_resampled_wavelength_z4-16.npy", 
-              redshift_path="dja_z4-16/dja_redshift_info_z4-16.npy", 
-              speclist_path="dja_z4-16/dja_source_id_info_z4-16.npy"):
+              data_path="dja_v4_z4-16/dja_v4_resampled_spectra_z4-16.npy", 
+              wavelength_path="dja_v4_z4-16/dja_v4_resampled_wavelength_z4-16.npy", 
+              redshift_path="dja_v4_z4-16/dja_v4_redshift_info_z4-16.npy", 
+              speclist_path="dja_v4_z4-16/dja_v4_source_id_info_z4-16.npy"):
     ### Load resampled spectra
     resampled_data = np.load(data_dir+data_path)
 
