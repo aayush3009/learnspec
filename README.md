@@ -51,7 +51,7 @@ learnspec/
 
 ```bash
 # Clone the repository
-git clone https://github.com/aayush3009/learnspec.git
+git clone anonymized_repo
 cd learnspec
 
 # Install dependencies
