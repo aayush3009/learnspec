@@ -137,7 +137,3 @@ After code changes:
 ```bash
 docker compose build --no-cache
 ```
-
-## Author
-
-Aayush Saxena (aayush.saxena@physics.ox.ac.uk)
