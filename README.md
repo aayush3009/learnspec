@@ -51,7 +51,7 @@ learnspec/
 
 ```bash
 # Clone the repository
-git clone https://github.com/aayush3009/learnspec.git
+git clone anonymized_repo
 cd learnspec
 
 # Install dependencies
@@ -137,7 +137,3 @@ After code changes:
 ```bash
 docker compose build --no-cache
 ```
-
-## Author
-
-Aayush Saxena (aayush.saxena@physics.ox.ac.uk)
