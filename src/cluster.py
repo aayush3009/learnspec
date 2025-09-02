@@ -102,6 +102,37 @@ def umap_latent_space(Z, n_neighbors=5, min_dist=0.0, metric='euclidean'):
     Z_umap = reducer.fit_transform(Z)
     return Z_umap
 
+def optimal_gmm_clustering(Z, n_components_range=None):
+    """
+    Find the optimal GMM clustering for the latent space.
+
+    Args:
+        Z (numpy.ndarray): Latent space representation
+        n_components_range (numpy.ndarray): Range of components to try
+
+    Returns:
+        tuple: Best labels and the corresponding GMM model
+    """
+    if n_components_range is None:
+        n_components_range = np.arange(5, 15)
+
+    best_silhouette = -1
+    best_labels = None
+    best_gmm = None
+    best_n_components = None
+
+    for n_components in n_components_range:
+        gmm = GaussianMixture(n_components=n_components, covariance_type='full')
+        labels = gmm.fit_predict(Z)
+        silhouette = silhouette_score(Z, labels)
+        if silhouette > best_silhouette:
+            best_silhouette = silhouette
+            best_labels = labels
+            best_gmm = gmm
+            best_n_components = n_components
+
+    return best_labels, best_gmm, best_n_components
+
 def plot_cluster_spectra(cluster_label, cluster_spectra, wavelength):
     plt.close()
     plt.figure(figsize=(12, 6))
