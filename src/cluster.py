@@ -131,7 +131,7 @@ def optimal_gmm_clustering(Z, n_components_range=None):
             best_gmm = gmm
             best_n_components = n_components
 
-    return best_labels, best_gmm, best_n_components
+    return best_silhouette, best_labels, best_gmm, best_n_components
 
 def plot_cluster_spectra(cluster_label, cluster_spectra, wavelength):
     plt.close()

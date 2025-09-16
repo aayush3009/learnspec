@@ -193,16 +193,25 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_re
     # === Encoder ===
     inputs = tf.keras.Input(shape=(input_dim,))
 
-    # First layer - compress to 512
+    # First layer - compress to 1024
     x = layers.Dense(
-        512, 
+        1024, 
         activation='relu',
         kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
     )(inputs)
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.2)(x)  # Add Dropout for regularization
 
-    # Second layer - compress to 256
+    # Second layer - compress to 512
+    x = layers.Dense(
+        512, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.2)(x)  # Add Dropout for regularization
+
+    # Third layer - compress to 256
     x = layers.Dense(
         256, 
         activation='relu',
@@ -211,7 +220,7 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_re
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.2)(x)  # Add Dropout for regularization
 
-    # Third layer - compress to 128
+    # Fourth layer - compress to 128
     x = layers.Dense(
         128, 
         activation='relu',
@@ -220,7 +229,7 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_re
     x = layers.BatchNormalization()(x)
     x = layers.Dropout(0.2)(x)  # Add Dropout for regularization
 
-    # Fourth layer - compress to 64
+    # Fifth layer - compress to 64
     x = layers.Dense(
         64, 
         activation='relu',
@@ -269,6 +278,15 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_re
     # Fourth layer - expand to 512
     x = layers.Dense(
         512, 
+        activation='relu',
+        kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+    )(x)
+    x = layers.BatchNormalization()(x)
+    x = layers.Dropout(0.2)(x)  # Add Dropout for regularization
+
+    # Fourth layer - expand to 1024
+    x = layers.Dense(
+        1024, 
         activation='relu',
         kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
     )(x)
