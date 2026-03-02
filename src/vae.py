@@ -185,7 +185,7 @@ def create_vae_model(input_dim, latent_dim=16, initial_learning_rate=1e-4, l2_re
     Args:
         input_dim (int): Dimension of input data
         latent_dim (int): Dimension of latent space
-        learning_rate (float): Learning rate for Adam optimizer
+        initial_learning_rate (float): Learning rate for Adam optimizer
         
     Returns:
         vae: Compiled VAE model
