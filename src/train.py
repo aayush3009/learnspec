@@ -10,6 +10,7 @@ import argparse
 import matplotlib.pyplot as plt
 import tensorflow as tf
 # from tensorflow.keras import layers, Model
+from learnspec.src.vae import create_vae_model, get_input_dim
 
 class ConvergenceCallback(tf.keras.callbacks.Callback):
     def __init__(self, patience=50, min_delta=2.0, min_epochs=100):
@@ -247,7 +248,7 @@ def main():
         vae_model = create_vae_model(
             input_dim=input_dim,
             latent_dim=args.latent_dim,
-            learning_rate=args.learning_rate
+            initial_learning_rate=args.learning_rate
         )
         
         print("\nStarting model training...")
