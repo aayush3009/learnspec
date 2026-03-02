@@ -67,7 +67,7 @@ class ConvergenceCallback(tf.keras.callbacks.Callback):
 
 
 ### Function to train the VAE model
-def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_size=64, shuffle=True):
+def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_size=64, shuffle=True, early_stopping_patience=50):
     """
     Trains the VAE model on the provided data
     
@@ -78,7 +78,7 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
         max_epochs (int): Maximum number of epochs to train
         batch_size (int): Size of each training batch
         shuffle (bool): Whether to shuffle the data before training
-        
+        early_stopping_patience (int): Number of epochs to wait before stopping training if no improvement
     Returns:
         history: Training history
     """
@@ -101,7 +101,7 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
 
     # Create convergence callback instance
     convergence = ConvergenceCallback(
-        patience=50,
+        patience=early_stopping_patience,
         min_delta=2,
         min_epochs=150
     )
@@ -112,7 +112,7 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
         tf.keras.callbacks.EarlyStopping(
             monitor='val_reconstruction_loss',
             mode='min',
-            patience=50,
+            patience=early_stopping_patience,
             restore_best_weights=True,
             verbose=1
         ),
@@ -163,6 +163,7 @@ def train_vae_model(model, data, validation_split=0.15, max_epochs=1000, batch_s
         shuffle=shuffle,
         callbacks=callbacks,
         verbose=1
+        early_stopping_patience=args.early_stopping_patience
     )
 
     # Check convergence status after training
